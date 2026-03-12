@@ -23,16 +23,25 @@ export const load: PageServerLoad = async (event) => {
 
   if (!membership) return redirect(302, '/onboarding');
 
+  // Allow viewing any team via ?team= query param (for demo / seeded data)
+  const teamIdParam = event.url.searchParams.get('team');
+
+  const allTeams = await db.select({ id: teams.id, name: teams.name }).from(teams);
+
+  const activeTeamId = teamIdParam
+    ? (allTeams.find(t => t.id === teamIdParam)?.id ?? membership.teamId)
+    : membership.teamId;
+
   const [team] = await db
     .select()
     .from(teams)
-    .where(eq(teams.id, membership.teamId))
+    .where(eq(teams.id, activeTeamId))
     .limit(1);
 
   const members = await db
     .select()
     .from(teamMembers)
-    .where(eq(teamMembers.teamId, membership.teamId));
+    .where(eq(teamMembers.teamId, activeTeamId));
 
   const currentWeek = getMonday(new Date());
 
@@ -41,7 +50,7 @@ export const load: PageServerLoad = async (event) => {
     .from(checkins)
     .where(
       and(
-        eq(checkins.teamId, membership.teamId),
+        eq(checkins.teamId, activeTeamId),
         eq(checkins.weekOf, currentWeek)
       )
     );
@@ -70,7 +79,7 @@ export const load: PageServerLoad = async (event) => {
     .from(checkins)
     .where(
       and(
-        eq(checkins.teamId, membership.teamId),
+        eq(checkins.teamId, activeTeamId),
         gte(checkins.weekOf, since)
       )
     );
@@ -94,12 +103,51 @@ export const load: PageServerLoad = async (event) => {
   }
   trendData.sort((a, b) => a.week.localeCompare(b.week));
 
+  // Tag distribution: all check-ins across history
+  const allTagCheckins = await db
+    .select({ tag: checkins.tag })
+    .from(checkins)
+    .where(eq(checkins.teamId, activeTeamId));
+
+  // Week-over-week change
+  const prevWeekDate = new Date();
+  prevWeekDate.setDate(prevWeekDate.getDate() - 7);
+  const prevWeek = getMonday(prevWeekDate);
+
+  const prevCheckins = await db
+    .select({
+      clarityScore: checkins.clarityScore,
+      executionScore: checkins.executionScore,
+      qualityScore: checkins.qualityScore,
+    })
+    .from(checkins)
+    .where(
+      and(
+        eq(checkins.teamId, activeTeamId),
+        eq(checkins.weekOf, prevWeek)
+      )
+    );
+
+  function dimAvg(rows: { clarityScore: number; executionScore: number; qualityScore: number }[], field: 'clarityScore' | 'executionScore' | 'qualityScore') {
+    if (!rows.length) return null;
+    return rows.reduce((s, r) => s + r[field], 0) / rows.length;
+  }
+
+  const weekOverWeek = {
+    clarity: { current: dimAvg(weekCheckins, 'clarityScore'), previous: dimAvg(prevCheckins, 'clarityScore') },
+    execution: { current: dimAvg(weekCheckins, 'executionScore'), previous: dimAvg(prevCheckins, 'executionScore') },
+    quality: { current: dimAvg(weekCheckins, 'qualityScore'), previous: dimAvg(prevCheckins, 'qualityScore') },
+  };
+
   return {
     team,
     members,
     weekCheckins: weekCheckinsWithNames,
     trendData,
     currentWeek,
-    memberCount: members.length
+    memberCount: members.length,
+    allTagCheckins,
+    weekOverWeek,
+    allTeams,
   };
 };
