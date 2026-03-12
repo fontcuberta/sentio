@@ -21,10 +21,11 @@ export const actions: Actions = {
         body: { email, password }
       });
     } catch (error) {
+      console.error('Sign-in error:', error);
       if (error instanceof APIError) {
         return fail(400, { message: error.message || 'Sign in failed' });
       }
-      return fail(500, { message: 'Unexpected error' });
+      return fail(500, { message: String(error) });
     }
 
     return redirect(302, '/');
@@ -43,10 +44,11 @@ export const actions: Actions = {
         body: { email, password, name }
       });
     } catch (error) {
+      console.error('Sign-up error:', error);
       if (error instanceof APIError) {
         return fail(400, { message: error.message || 'Registration failed' });
       }
-      return fail(500, { message: 'Unexpected error' });
+      return fail(500, { message: String(error) });
     }
 
     return redirect(302, '/');
