@@ -83,7 +83,9 @@
   <div class="dash-header">
     <div>
       <h1>Dashboard</h1>
-      <p class="subtitle">Your team's product pulse at a glance.</p>
+      <p class="subtitle">
+        Scores run from 1–5. Think of 3 as "steady", 4–5 as strong, and 1–2 as a clear signal to slow down and look closer.
+      </p>
     </div>
     {#if data.allTeams.length > 1}
       <select
@@ -104,6 +106,9 @@
   <!-- Score cards with week-over-week delta -->
   <section class="pulse-overview">
     <h2 class="section-title">This week's pulse</h2>
+    <p class="section-hint">
+      Each number is the average check-in for this week. Arrows show how much that dimension moved vs. last week.
+    </p>
     <div class="score-cards">
       {#each dimensions as dim}
         {@const wowKey = dim.key === 'clarityScore' ? 'clarity' : dim.key === 'executionScore' ? 'execution' : 'quality'}
@@ -126,14 +131,21 @@
     </p>
   </section>
 
-  <!-- Radar + Heatmap side by side -->
-  <section class="two-col">
-    <div class="col">
+  <!-- Radar + Member breakdown stacked -->
+  <section class="stacked-section">
+    <div class="stacked-block">
       <h2 class="section-title">Radar overview</h2>
+      <p class="section-hint">
+        The shape shows how balanced the week feels across clarity, execution, and quality. A tight, centered shape means \"OK\", a large balanced shape means \"strong\".
+      </p>
       <RadarChart {dimensions} />
     </div>
-    <div class="col">
+
+    <div class="stacked-block">
       <h2 class="section-title">Member breakdown</h2>
+      <p class="section-hint">
+        Each row is one person’s scores for this week. Use it to spot outliers or consistently low scores.
+      </p>
       <MemberHeatmap checkins={data.weekCheckins} />
     </div>
   </section>
@@ -173,18 +185,27 @@
   <!-- Trends line chart -->
   <section class="trend-section">
     <h2 class="section-title">Trends (last 8 weeks)</h2>
+    <p class="section-hint">
+      Lines show weekly averages per dimension. Look for inflection points, not single-week noise.
+    </p>
     <PulseChart data={data.trendData} />
   </section>
 
   <!-- Tag distribution -->
   <section class="tag-section">
     <h2 class="section-title">Sentiment tags (all time)</h2>
+    <p class="section-hint">
+      These tags come from individual check-ins. They’re a quick read on how often the team is flagging momentum, risk, or being blocked.
+    </p>
     <TagDistribution checkins={data.allTagCheckins} />
   </section>
 
   <!-- Reflections -->
   <section class="reflections-section">
     <h2 class="section-title">Reflections</h2>
+    <p class="section-hint">
+      Short written notes from this week’s check-ins. Use them to add narrative to the numbers above.
+    </p>
     <ReflectionFeed checkins={data.weekCheckins} />
   </section>
 
@@ -204,7 +225,11 @@
 
 <style>
   .dashboard-view h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
-  .subtitle { color: var(--text-muted); margin-bottom: 0; }
+  .subtitle {
+    color: var(--text-muted);
+    margin-bottom: 0;
+    max-width: 36rem;
+  }
 
   .dash-header {
     display: flex;
@@ -212,6 +237,18 @@
     justify-content: space-between;
     gap: 1rem;
     margin-bottom: 2rem;
+  }
+
+  @media (max-width: 768px) {
+    .dash-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .team-select {
+      width: 100%;
+    }
   }
 
   .team-select {
@@ -272,18 +309,27 @@
     margin-bottom: 2rem;
   }
 
-  .two-col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
+  .stacked-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
     margin-top: 2rem;
   }
 
-  @media (max-width: 768px) {
-    .two-col { grid-template-columns: 1fr; }
+  .stacked-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
   }
 
-  section + section { margin-top: 2rem; }
+  section + section { margin-top: 2.25rem; }
+
+  .section-hint {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+    max-width: 32rem;
+  }
 
   .signals-title {
     display: flex;
