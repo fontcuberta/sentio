@@ -104,6 +104,20 @@
     </div>
   </section>
 
+  {#if data.generalSignals?.length}
+    <section class="signals-section">
+      <h2 class="section-title">Signals from #general</h2>
+      <div class="card signals-card">
+        <ul class="signals-list">
+          {#each data.generalSignals as msg}
+            <li class="signal">{msg}</li>
+          {/each}
+        </ul>
+        <p class="signals-footnote">Pulled from recent channel messages. Usernames are not stored or displayed.</p>
+      </div>
+    </section>
+  {/if}
+
   <!-- Trends line chart -->
   <section class="trend-section">
     <h2 class="section-title">Trends (last 8 weeks)</h2>
@@ -218,4 +232,35 @@
   }
 
   section + section { margin-top: 2rem; }
+
+  .signals-card {
+    padding: 1.25rem;
+    background: radial-gradient(circle at 0% 0%, rgba(0, 240, 255, 0.06), transparent 55%),
+                radial-gradient(circle at 100% 100%, rgba(57, 255, 20, 0.05), transparent 55%),
+                var(--bg-card);
+  }
+
+  .signals-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0;
+    margin: 0;
+  }
+
+  .signal {
+    padding: 0.75rem 0.9rem;
+    border: 1px solid rgba(42, 42, 58, 0.8);
+    border-radius: 10px;
+    background: rgba(10, 10, 15, 0.45);
+    color: var(--text);
+    line-height: 1.45;
+  }
+
+  .signals-footnote {
+    margin-top: 0.9rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
 </style>

@@ -52,19 +52,8 @@ const reflections = [
 // Team archetypes with different "personality" score ranges
 const teamConfigs = [
   {
-    name: 'Button School',
-    inviteCode: 'BTN-001',
-    members: ['Nevan', 'Sofia', 'Marcus', 'Priya'],
-    // Healthy team trending up
-    profile: (weeksAgo: number) => ({
-      clarity:   Math.min(5, rand(3, 4) + (weeksAgo < 3 ? 1 : 0)),
-      execution: Math.min(5, rand(3, 5)),
-      quality:   Math.min(5, rand(3, 4) + (weeksAgo < 2 ? 1 : 0)),
-    }),
-  },
-  {
     name: 'Nebula Labs',
-    inviteCode: 'NEB-042',
+    inviteCode: 'NEB042',
     members: ['Alex', 'Jordan', 'Casey', 'Riley', 'Morgan'],
     // Declining team — started strong, dropping
     profile: (weeksAgo: number) => ({
@@ -75,7 +64,7 @@ const teamConfigs = [
   },
   {
     name: 'Orbit Engine',
-    inviteCode: 'ORB-777',
+    inviteCode: 'ORB777',
     members: ['Sam', 'Taylor', 'Jamie'],
     // Volatile team — scores swing a lot
     profile: (_weeksAgo: number) => ({
@@ -86,7 +75,7 @@ const teamConfigs = [
   },
   {
     name: 'Patchwork Co',
-    inviteCode: 'PAT-999',
+    inviteCode: 'PAT999',
     members: ['Drew', 'Avery', 'Quinn', 'Blake', 'Charlie', 'Dakota'],
     // Consistently mediocre
     profile: (_weeksAgo: number) => ({
@@ -99,6 +88,15 @@ const teamConfigs = [
 
 async function seed() {
   console.log('Seeding database...\n');
+
+  // Clean up all existing teams and data, then keep only our three demo teams.
+  // This removes all existing teams (including old seeds or manual ones),
+  // then we re-create Nebula Labs, Orbit Engine, and Patchwork Co from scratch.
+  console.log('  Clearing existing teams, members, and check-ins...');
+  await sql`DELETE FROM checkins`;
+  await sql`DELETE FROM team_members`;
+  await sql`DELETE FROM teams`;
+  console.log('  Cleared.\n');
 
   // Create auth users for all members across all teams
   const userMap = new Map<string, string>(); // displayName -> userId

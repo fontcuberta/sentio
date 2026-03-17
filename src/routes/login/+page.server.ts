@@ -5,7 +5,7 @@ import { APIError } from 'better-auth/api';
 
 export const load: PageServerLoad = async (event) => {
   if (event.locals.user) {
-    return redirect(302, '/dashboard');
+    return redirect(302, '/checkin');
   }
   return {};
 };
@@ -28,7 +28,7 @@ export const actions: Actions = {
       return fail(500, { message: String(error) });
     }
 
-    return redirect(302, '/');
+    return redirect(302, '/checkin');
   },
 
   signUp: async (event) => {
@@ -51,7 +51,7 @@ export const actions: Actions = {
       return fail(500, { message: String(error) });
     }
 
-    return redirect(302, '/');
+    return redirect(302, '/checkin');
   },
 
   signOut: async (event) => {

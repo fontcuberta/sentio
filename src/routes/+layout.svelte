@@ -7,11 +7,16 @@
 
 <svelte:head>
   <title>Sentio</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="alternate icon" href="/favicon.svg" />
 </svelte:head>
 
 {#if data.user}
   <nav class="main-nav">
-    <a href="/dashboard" class="nav-brand">Sentio</a>
+    <a href="/dashboard" class="nav-brand">
+      <span class="nav-brand-mark" aria-hidden="true"></span>
+      <span>Sentio</span>
+    </a>
     <div class="nav-links">
       <a href="/dashboard">Dashboard</a>
       <a href="/checkin">Check-in</a>
@@ -41,12 +46,28 @@
   }
 
   .nav-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
     font-weight: 700;
     font-size: 1.125rem;
     color: var(--accent);
     text-decoration: none;
     text-shadow: 0 0 10px var(--accent-glow);
     letter-spacing: 0.05em;
+  }
+
+  .nav-brand-mark {
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    background: radial-gradient(circle at 20% 0%, rgba(0, 240, 255, 0.9), transparent 60%),
+                radial-gradient(circle at 80% 100%, rgba(57, 255, 20, 0.8), transparent 55%),
+                #05050a;
+    box-shadow:
+      0 0 12px rgba(0, 240, 255, 0.6),
+      0 0 18px rgba(57, 255, 20, 0.5);
+    border: 1px solid rgba(0, 240, 255, 0.5);
   }
 
   .nav-links {

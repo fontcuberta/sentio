@@ -21,8 +21,8 @@
 </script>
 
 <div class="checkin-view">
-  <h1>Weekly Check-in</h1>
-  <p class="subtitle">How are things going this week? Takes about 60 seconds.</p>
+  <h1>Weekly check-in</h1>
+  <p class="subtitle">Take a minute to capture how the week really feels.</p>
 
   {#if data.existing}
     <div class="revision-notice">
@@ -36,17 +36,23 @@
     {#each dimensions as dim}
       <div class="dimension">
         <div class="dimension-header">
-          <label for={dim.key}>{dim.label}</label>
+          <div>
+            <label for={dim.key}>{dim.label}</label>
+            <p class="dimension-hint">{dim.hint}</p>
+          </div>
           <span class="dimension-value">{dim.value}</span>
         </div>
-        <p class="dimension-hint">{dim.hint}</p>
-        <input
-          id={dim.key}
-          name={dim.key + 'Score'}
-          type="range" min="1" max="5" step="1"
-          bind:value={dim.value}
-          class="slider"
-        />
+        <div class="slider-row">
+          <span class="slider-end slider-low">Low</span>
+          <input
+            id={dim.key}
+            name={dim.key + 'Score'}
+            type="range" min="1" max="5" step="1"
+            bind:value={dim.value}
+            class="slider"
+          />
+          <span class="slider-end slider-high">High</span>
+        </div>
         <div class="slider-labels">
           <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
         </div>
@@ -81,7 +87,7 @@
     </div>
 
     <button type="submit" class="btn btn-primary submit-btn">
-      {data.existing ? 'Update check-in' : 'Submit check-in'}
+      {data.existing ? 'Save this week again' : 'Save this week'}
     </button>
 
     {#if form?.message}
@@ -91,8 +97,8 @@
 </div>
 
 <style>
-  .checkin-view h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
-  .subtitle { color: var(--text-muted); margin-bottom: 2rem; }
+  .checkin-view h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--text-muted); margin-bottom: 1.75rem; max-width: 32rem; }
 
   .revision-notice {
     background: var(--accent-dim);
@@ -109,7 +115,13 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    max-width: 560px;
+    max-width: 620px;
+    background: radial-gradient(circle at 0% 0%, rgba(0, 240, 255, 0.05), transparent 55%),
+                radial-gradient(circle at 100% 100%, rgba(255, 46, 170, 0.06), transparent 55%),
+                var(--bg-card);
+    box-shadow:
+      0 0 40px rgba(0, 240, 255, 0.04),
+      0 0 40px rgba(255, 46, 170, 0.03);
   }
 
   .dimension { display: flex; flex-direction: column; gap: 0.25rem; }
@@ -117,9 +129,9 @@
   .dimension-header {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
+    align-items: flex-start;
   }
-  .dimension-header label { font-weight: 600; }
+  .dimension-header label { font-weight: 600; font-size: 0.95rem; }
 
   .dimension-value {
     font-size: 1.5rem;
@@ -131,10 +143,26 @@
 
   .dimension-hint { color: var(--text-muted); font-size: 0.8125rem; margin-bottom: 0.25rem; }
 
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.25rem;
+  }
+
+  .slider-end {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .slider-low { color: var(--neon-red); }
+  .slider-high { color: var(--neon-green); text-align: right; }
+
   .slider {
     -webkit-appearance: none;
     appearance: none;
-    width: 100%;
+    flex: 1;
     height: 6px;
     background: var(--border);
     border-radius: 3px;

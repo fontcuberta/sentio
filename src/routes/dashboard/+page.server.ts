@@ -139,6 +139,25 @@ export const load: PageServerLoad = async (event) => {
     quality: { current: dimAvg(weekCheckins, 'qualityScore'), previous: dimAvg(prevCheckins, 'qualityScore') },
   };
 
+  // Discord “status signals” from #general (content only). Optional.
+  let generalSignals: string[] = [];
+  try {
+    const origin = event.url.origin;
+    const res = await fetch(`${origin}/api/discord-general`, {
+      headers: {
+        cookie: event.request.headers.get('cookie') ?? ''
+      }
+    });
+    if (res.ok) {
+      const body = await res.json();
+      if (Array.isArray(body?.messages)) {
+        generalSignals = body.messages.filter((m: any) => typeof m === 'string');
+      }
+    }
+  } catch {
+    generalSignals = [];
+  }
+
   return {
     team,
     members,
@@ -149,5 +168,6 @@ export const load: PageServerLoad = async (event) => {
     allTagCheckins,
     weekOverWeek,
     allTeams,
+    generalSignals,
   };
 };

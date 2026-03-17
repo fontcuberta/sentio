@@ -19,5 +19,5 @@ export const load: PageServerLoad = async (event) => {
     return redirect(302, '/onboarding');
   }
 
-  return redirect(302, '/dashboard');
+  return redirect(302, '/checkin');
 };
