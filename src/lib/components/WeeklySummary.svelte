@@ -68,9 +68,10 @@
         body: JSON.stringify({ team_id: teamId, week_of: weekOf })
       });
 
+      const resBody = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        const body = await res.json();
-        throw new Error(body.error || 'Failed to send');
+        throw new Error(resBody.error || `Failed (status ${res.status})`);
       }
 
       sent = true;

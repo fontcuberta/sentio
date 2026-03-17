@@ -20,6 +20,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
   if (!team) return error(404, 'Team not found');
   if (!team.discordWebhookUrl) return error(400, 'No Discord webhook configured');
+  if (!team.discordWebhookUrl.startsWith('https://discord.com/api/webhooks/')) {
+    return error(400, 'Invalid webhook URL. Go to Settings and paste a proper Discord webhook URL (Edit Channel → Integrations → Webhooks).');
+  }
 
   const weekCheckins = await db
     .select()
@@ -75,15 +78,25 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     }]
   };
 
-  const discordRes = await fetch(team.discordWebhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(discordPayload),
-  });
+  let discordRes: Response;
+  try {
+    discordRes = await fetch(team.discordWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(discordPayload),
+    });
+  } catch (fetchErr: any) {
+    return error(502, `Discord fetch failed: ${String(fetchErr)}`);
+  }
+
+  const discordBody = await discordRes.text();
+
+  if (discordBody.trimStart().startsWith('<!DOCTYPE') || discordBody.trimStart().startsWith('<html')) {
+    return error(502, 'Discord returned an HTML page instead of accepting the webhook. Check that the webhook URL is correct.');
+  }
 
   if (!discordRes.ok) {
-    const text = await discordRes.text();
-    return error(502, `Discord error: ${text}`);
+    return error(502, `Discord error: ${discordBody}`);
   }
 
   return json({ success: true });

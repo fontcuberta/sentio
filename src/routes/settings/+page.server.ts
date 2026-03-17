@@ -55,6 +55,10 @@ export const actions: Actions = {
 
     if (!membership) return fail(403, { message: 'Only admins can update settings' });
 
+    if (webhookUrl && !webhookUrl.startsWith('https://discord.com/api/webhooks/')) {
+      return fail(400, { message: 'Invalid webhook URL. It must start with https://discord.com/api/webhooks/  — go to your Discord channel → Edit Channel → Integrations → Webhooks to get it.' });
+    }
+
     await db
       .update(teams)
       .set({ discordWebhookUrl: webhookUrl })
