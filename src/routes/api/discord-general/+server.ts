@@ -37,30 +37,67 @@ export const GET: RequestHandler = async () => {
   const channelId = env.DISCORD_GENERAL_CHANNEL_ID;
 
   if (!token || !channelId) {
-    return json({ messages: [] });
+    return json({
+      messages: [],
+      debug: {
+        hasToken: !!token,
+        hasChannelId: !!channelId
+      }
+    });
   }
 
   const url = `https://discord.com/api/v10/channels/${channelId}/messages?limit=50`;
 
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bot ${token}`,
-    }
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: {
+        Authorization: `Bot ${token}`,
+      }
+    });
+  } catch (err: any) {
+    return json({
+      messages: [],
+      debug: {
+        hasToken: true,
+        hasChannelId: true,
+        fetchOk: false,
+        fetchError: String(err)
+      }
+    }, { status: 502 });
+  }
 
   if (!res.ok) {
     const body = await res.text();
-    return error(502, `Discord API error: ${res.status} – ${body}`);
+    return json({
+      messages: [],
+      debug: {
+        hasToken: true,
+        hasChannelId: true,
+        fetchOk: false,
+        status: res.status,
+        body: body.slice(0, 200)
+      }
+    }, { status: 502 });
   }
 
   const raw = await res.json() as any[];
 
   const messages = raw
-    .map((m) => String(m?.content ?? '').trim())
-    .filter(looksLikeStatusMessage)
-    .filter((c) => c.length >= 10)
+    .map((m) => {
+      const content = String(m?.content ?? '').trim();
+      return {
+        content,
+        matched: looksLikeStatusMessage(content),
+      };
+    })
     .slice(0, 12);
 
-  return json({ messages });
+  return json({
+    messages,
+    debug: {
+      count: raw.length,
+    }
+  });
 };
 

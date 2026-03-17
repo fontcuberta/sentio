@@ -151,7 +151,14 @@ export const load: PageServerLoad = async (event) => {
     if (res.ok) {
       const body = await res.json();
       if (Array.isArray(body?.messages)) {
-        generalSignals = body.messages.filter((m: any) => typeof m === 'string');
+        generalSignals = body.messages
+          .map((m: any) =>
+            typeof m === 'string'
+              ? m
+              : (typeof m?.content === 'string' ? m.content : '')
+          )
+          .map((s: string) => s.trim())
+          .filter((s: string) => s.length > 0);
       }
     }
   } catch {
