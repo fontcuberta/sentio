@@ -179,6 +179,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     overflow-x: auto;
+    width: 100%;
   }
 
   .users-table {
@@ -217,7 +218,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.35rem;
-    max-width: 320px;
+    max-width: none;
   }
 
   .team-pill {
@@ -251,7 +252,7 @@
     gap: 0.75rem;
     align-items: center;
     flex-wrap: wrap;
-    max-width: 360px;
+    max-width: none;
   }
 
   .reset-cell input {

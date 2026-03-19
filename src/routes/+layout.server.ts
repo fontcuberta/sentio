@@ -6,6 +6,7 @@ export const load: LayoutServerLoad = async (event) => {
   const isSuperadmin = user?.email?.toLowerCase() === SUPERADMIN_EMAIL;
   return {
     user,
-    isSuperadmin
+    isSuperadmin,
+    pathname: event.url.pathname
   };
 };

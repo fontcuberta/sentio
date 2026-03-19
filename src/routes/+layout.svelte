@@ -31,7 +31,7 @@
   </nav>
 {/if}
 
-<main class="main-content">
+<main class="main-content" class:main-content-wide={data.pathname?.startsWith('/users')}>
   {@render children()}
 </main>
 
@@ -117,5 +117,9 @@
     max-width: 900px;
     margin: 0 auto;
     padding: 2rem 1.5rem;
+  }
+
+  .main-content-wide {
+    max-width: 1200px;
   }
 </style>
