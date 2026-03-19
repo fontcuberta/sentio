@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import { teams, teamMembers, checkins, organizations, user as authUser } from '$lib/server/db/schema';
+import { teams, teamMembers, checkins } from '$lib/server/db/schema';
 import { eq, and, gte, inArray } from 'drizzle-orm';
 
 function getMonday(d: Date): string {
@@ -207,52 +207,6 @@ export const load: PageServerLoad = async (event) => {
     generalSignals = [];
   }
 
-  // Superadmin: list all users + their team memberships (for password resets).
-  let adminUsers: {
-    id: string;
-    email: string;
-    name: string;
-    emailVerified: boolean;
-    memberships: { organizationName: string; teamName: string; role: string }[];
-  }[] = [];
-
-  if (isSuperadmin) {
-    const allUsers = await db
-      .select({
-        id: authUser.id,
-        email: authUser.email,
-        name: authUser.name,
-        emailVerified: authUser.emailVerified,
-      })
-      .from(authUser);
-
-    const allMemberships = await db
-      .select({
-        userId: teamMembers.userId,
-        role: teamMembers.role,
-        organizationName: organizations.name,
-        teamName: teams.name,
-      })
-      .from(teamMembers)
-      .innerJoin(teams, eq(teamMembers.teamId, teams.id))
-      .innerJoin(organizations, eq(teams.organizationId, organizations.id));
-
-    const membershipByUserId = new Map<string, { organizationName: string; teamName: string; role: string }[]>();
-    for (const m of allMemberships) {
-      const list = membershipByUserId.get(m.userId) ?? [];
-      list.push({ organizationName: m.organizationName, teamName: m.teamName, role: m.role });
-      membershipByUserId.set(m.userId, list);
-    }
-
-    adminUsers = allUsers.map(u => ({
-      id: u.id,
-      email: u.email,
-      name: u.name,
-      emailVerified: u.emailVerified,
-      memberships: membershipByUserId.get(u.id) ?? [],
-    }));
-  }
-
   return {
     team,
     members,
@@ -266,7 +220,5 @@ export const load: PageServerLoad = async (event) => {
     allTeams,
     generalSignals,
     canPostToDiscord: isSuperadmin || isOrgAdmin,
-    isSuperadmin,
-    adminUsers,
   };
 };

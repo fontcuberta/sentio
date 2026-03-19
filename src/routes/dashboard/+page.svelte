@@ -9,41 +9,6 @@
 
   let { data }: { data: PageServerData } = $props();
 
-  let passwordByUserId = $state<Record<string, string>>({});
-  let busyUserId = $state<string | null>(null);
-  let newPasswordByUserId = $state<Record<string, string>>({});
-  let errorMsg = $state<string>('');
-
-  async function resetUserPassword(userId: string) {
-    errorMsg = '';
-    busyUserId = userId;
-    try {
-      const password = (passwordByUserId[userId] ?? '').trim() || null;
-      const res = await fetch('/api/admin/reset-user-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, password }),
-      });
-
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(body?.message || `Reset failed (status ${res.status})`);
-      }
-
-      if (body?.newPassword) {
-        newPasswordByUserId = { ...newPasswordByUserId, [userId]: body.newPassword };
-      }
-    } catch (e: any) {
-      errorMsg = e?.message ?? 'Reset failed';
-    } finally {
-      busyUserId = null;
-    }
-  }
-
-  async function copyText(textToCopy: string) {
-    await navigator.clipboard.writeText(textToCopy);
-  }
-
   function avg(field: string): number | null {
     if (!data.weekCheckins.length) return null;
     const sum = data.weekCheckins.reduce((acc: number, c: any) => acc + c[field], 0);
@@ -225,86 +190,6 @@
     </p>
     <PulseChart data={data.trendData} />
   </section>
-
-  {#if data.isSuperadmin}
-    <section class="admin-users-section">
-      <h2 class="section-title">Admin: All Users</h2>
-      <p class="section-hint">
-        Reset user passwords (Better Auth credential login). Your reset UI never shows existing passwords.
-      </p>
-
-      {#if errorMsg}
-        <p class="error">{errorMsg}</p>
-      {/if}
-
-      <div class="admin-users-grid">
-        {#each data.adminUsers as u (u.id)}
-          <div class="admin-user card">
-            <div class="admin-user-header">
-              <div class="admin-user-meta">
-                <div class="admin-user-name">{u.name}</div>
-                <div class="admin-user-email">{u.email}</div>
-                <div class="admin-user-badges">
-                  <span class="tag tag-neutral">{u.emailVerified ? 'email verified' : 'email not verified'}</span>
-                  {#if u.memberships.length}
-                    <span class="tag tag-momentum">{u.memberships[0].organizationName}</span>
-                  {/if}
-                </div>
-              </div>
-            </div>
-
-            <div class="admin-user-memberships">
-              {#each u.memberships as m (m.organizationName + m.teamName + m.role)}
-                <div class="membership-line">
-                  <span class="membership-org">{m.organizationName}</span>
-                  <span class="membership-team">• {m.teamName}</span>
-                  <span class="membership-role">({m.role})</span>
-                </div>
-              {/each}
-              {#if !u.memberships.length}
-                <div class="membership-line muted">No team memberships</div>
-              {/if}
-            </div>
-
-            <div class="admin-user-reset">
-              <input
-                type="password"
-                placeholder="New password (leave blank to generate)"
-                value={passwordByUserId[u.id] ?? ''}
-                oninput={(e) => {
-                  const v = (e.currentTarget as HTMLInputElement).value;
-                  passwordByUserId = { ...passwordByUserId, [u.id]: v };
-                }}
-              />
-              <button
-                class="btn btn-primary"
-                disabled={busyUserId === u.id}
-                onclick={() => resetUserPassword(u.id)}
-              >
-                {busyUserId === u.id ? 'Resetting...' : 'Reset password'}
-              </button>
-            </div>
-
-            {#if newPasswordByUserId[u.id]}
-              <div class="admin-user-new-password">
-                <div class="muted">New password (save this):</div>
-                <div class="new-password-row">
-                  <code>{newPasswordByUserId[u.id]}</code>
-                  <button
-                    class="btn btn-secondary"
-                    type="button"
-                    onclick={() => copyText(newPasswordByUserId[u.id])}
-                  >
-                    Copy
-                  </button>
-                </div>
-              </div>
-            {/if}
-          </div>
-        {/each}
-      </div>
-    </section>
-  {/if}
 
   <!-- Tag distribution -->
   <section class="tag-section">
@@ -539,64 +424,5 @@
     margin-top: 0.9rem;
     font-size: 0.75rem;
     color: var(--text-muted);
-  }
-
-  .admin-users-section { margin-top: 2rem; }
-  .admin-users-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 1rem;
-    margin-top: 1rem;
-  }
-  @media (min-width: 900px) {
-    .admin-users-grid { grid-template-columns: 1fr 1fr; }
-  }
-
-  .admin-user {
-    padding: 1rem 1rem 1.25rem;
-  }
-  .admin-user-name { font-weight: 700; font-size: 1rem; margin-bottom: 0.15rem; }
-  .admin-user-email { color: var(--text-muted); font-size: 0.875rem; }
-  .admin-user-badges { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
-
-  .admin-user-memberships {
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-  }
-  .membership-line { font-size: 0.875rem; color: var(--text); }
-  .membership-line.muted { color: var(--text-muted); }
-  .membership-org { font-weight: 600; }
-  .membership-role { color: var(--text-muted); }
-
-  .admin-user-reset {
-    margin-top: 0.85rem;
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-  .admin-user-reset input {
-    flex: 1;
-    min-width: 240px;
-    padding: 0.6rem 0.75rem;
-    border-radius: 8px;
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    color: var(--text);
-  }
-
-  .admin-user-new-password { margin-top: 0.85rem; }
-  .new-password-row { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
-  .new-password-row code {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 0.5rem 0.75rem;
-    color: var(--text);
-    word-break: break-word;
   }
 </style>

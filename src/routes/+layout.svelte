@@ -21,6 +21,9 @@
       <a href="/dashboard">Dashboard</a>
       <a href="/checkin">Check-in</a>
       <a href="/settings">Settings</a>
+      {#if data.isSuperadmin}
+        <a href="/users">Users</a>
+      {/if}
       <form method="post" action="/login?/signOut" class="inline-form">
         <button class="nav-signout">Sign out</button>
       </form>
