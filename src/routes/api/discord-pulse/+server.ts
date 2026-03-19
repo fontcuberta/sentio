@@ -4,6 +4,8 @@ import { db } from '$lib/server/db';
 import { teams, teamMembers, checkins } from '$lib/server/db/schema';
 import { eq, and } from 'drizzle-orm';
 
+const SUPERADMIN_EMAIL = 'isafontcu@gmail.com';
+
 export const POST: RequestHandler = async ({ request, locals }) => {
   if (!locals.user) return error(401, 'Not authenticated');
 
@@ -13,7 +15,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   if (!team_id || !week_of) return error(400, 'team_id and week_of are required');
 
   const [team] = await db
-    .select({ name: teams.name, discordWebhookUrl: teams.discordWebhookUrl })
+    .select({ name: teams.name, discordWebhookUrl: teams.discordWebhookUrl, organizationId: teams.organizationId })
     .from(teams)
     .where(eq(teams.id, team_id))
     .limit(1);
@@ -22,6 +24,27 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   if (!team.discordWebhookUrl) return error(400, 'No Discord webhook configured');
   if (!team.discordWebhookUrl.startsWith('https://discord.com/api/webhooks/')) {
     return error(400, 'Invalid webhook URL. Go to Settings and paste a proper Discord webhook URL (Edit Channel → Integrations → Webhooks).');
+  }
+
+  const viewerEmail = locals.user.email?.toLowerCase();
+  const isSuperadmin = viewerEmail === SUPERADMIN_EMAIL;
+
+  // Only superadmin or org-admins (role=admin within the team’s org) can post pulses.
+  if (!isSuperadmin) {
+    const [adminMembership] = await db
+      .select({ teamId: teams.id })
+      .from(teamMembers)
+      .innerJoin(teams, eq(teamMembers.teamId, teams.id))
+      .where(
+        and(
+          eq(teamMembers.userId, locals.user.id),
+          eq(teamMembers.role, 'admin'),
+          eq(teams.organizationId, team.organizationId)
+        )
+      )
+      .limit(1);
+
+    if (!adminMembership) return error(403, 'Forbidden');
   }
 
   const weekCheckins = await db

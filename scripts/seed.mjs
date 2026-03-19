@@ -7,6 +7,7 @@ const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) throw new Error('DATABASE_URL is not set');
 
 const DISCORD_GENERAL_CHANNEL_ID = process.env.DISCORD_GENERAL_CHANNEL_ID ?? '';
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL ?? null;
 
 const sql = neon(DATABASE_URL);
 
@@ -264,7 +265,7 @@ async function seed() {
           ${organizationId},
           ${`${org.name} - ${team.name}`},
           ${team.inviteCode},
-          NULL,
+          ${DISCORD_WEBHOOK_URL},
           ${DISCORD_GENERAL_CHANNEL_ID || null},
           ${orgAdminUserId},
           NOW()
