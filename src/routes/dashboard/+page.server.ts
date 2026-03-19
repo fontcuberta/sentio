@@ -2,7 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { teams, teamMembers, checkins } from '$lib/server/db/schema';
-import { eq, and, gte } from 'drizzle-orm';
+import { eq, and, gte, inArray } from 'drizzle-orm';
 
 function getMonday(d: Date): string {
   const date = new Date(d);
@@ -15,28 +15,66 @@ function getMonday(d: Date): string {
 export const load: PageServerLoad = async (event) => {
   if (!event.locals.user) return redirect(302, '/login');
 
-  const [membership] = await db
+  const viewer = event.locals.user;
+  const viewerEmail = viewer.email?.toLowerCase();
+  const SUPERADMIN_EMAIL = 'isafontcu@gmail.com';
+  const isSuperadmin = viewerEmail === SUPERADMIN_EMAIL;
+
+  const memberships = await db
     .select()
     .from(teamMembers)
-    .where(eq(teamMembers.userId, event.locals.user.id))
-    .limit(1);
+    .where(eq(teamMembers.userId, viewer.id));
 
-  if (!membership) return redirect(302, '/onboarding');
+  if (!memberships.length) return redirect(302, '/onboarding');
 
-  // Allow viewing any team via ?team= query param (for demo / seeded data)
+  const memberTeamIds = memberships.map(m => m.teamId);
+
+  // Determine allowed teams:
+  // - superadmin: all teams
+  // - org-admin (role=admin on any team): all teams within those orgs
+  // - member: teams they're a member of
+  let allTeams: { id: string; name: string }[] = [];
+  let isOrgAdmin = false;
+
+  if (isSuperadmin) {
+    allTeams = await db.select({ id: teams.id, name: teams.name }).from(teams);
+  } else {
+    const adminTeamIds = memberships.filter(m => m.role === 'admin').map(m => m.teamId);
+    isOrgAdmin = adminTeamIds.length > 0;
+
+    if (isOrgAdmin) {
+      const adminOrgRows = await db
+        .select({ organizationId: teams.organizationId })
+        .from(teams)
+        .where(inArray(teams.id, adminTeamIds));
+      const orgIds = Array.from(new Set(adminOrgRows.map(r => r.organizationId)));
+
+      allTeams = await db
+        .select({ id: teams.id, name: teams.name })
+        .from(teams)
+        .where(inArray(teams.organizationId, orgIds));
+    } else {
+      allTeams = await db
+        .select({ id: teams.id, name: teams.name })
+        .from(teams)
+        .where(inArray(teams.id, memberTeamIds));
+    }
+  }
+
+  const allowedTeamIds = allTeams.map(t => t.id);
+
   const teamIdParam = event.url.searchParams.get('team');
-
-  const allTeams = await db.select({ id: teams.id, name: teams.name }).from(teams);
-
-  const activeTeamId = teamIdParam
-    ? (allTeams.find(t => t.id === teamIdParam)?.id ?? membership.teamId)
-    : membership.teamId;
+  const activeTeamId = teamIdParam && allowedTeamIds.includes(teamIdParam)
+    ? teamIdParam
+    : allowedTeamIds[0] ?? memberTeamIds[0];
 
   const [team] = await db
     .select()
     .from(teams)
     .where(eq(teams.id, activeTeamId))
     .limit(1);
+
+  if (!team) return redirect(302, '/dashboard');
 
   const members = await db
     .select()
@@ -45,7 +83,8 @@ export const load: PageServerLoad = async (event) => {
 
   const currentWeek = getMonday(new Date());
 
-  const weekCheckins = await db
+  // Heatmap + aggregates always use all members in the team.
+  const weekCheckinsAll = await db
     .select()
     .from(checkins)
     .where(
@@ -55,16 +94,19 @@ export const load: PageServerLoad = async (event) => {
       )
     );
 
-  const nameMap = Object.fromEntries(
-    members.map(m => [m.userId, m.displayName])
-  );
+  const nameMap = Object.fromEntries(members.map(m => [m.userId, m.displayName]));
 
-  const weekCheckinsWithNames = weekCheckins.map(c => ({
+  const weekCheckinsWithNamesAll = weekCheckinsAll.map(c => ({
     ...c,
     displayName: nameMap[c.userId] ?? 'Anonymous'
   }));
 
-  // Trend data: last 8 weeks
+  // Member resume isolation: non-admins only see their own reflections.
+  const weekCheckinsForReflection = isSuperadmin || isOrgAdmin
+    ? weekCheckinsWithNamesAll
+    : weekCheckinsWithNamesAll.filter(c => c.userId === viewer.id);
+
+  // Trend data: last 8 weeks (team-level averages)
   const eightWeeksAgo = new Date();
   eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 56);
   const since = getMonday(eightWeeksAgo);
@@ -103,13 +145,13 @@ export const load: PageServerLoad = async (event) => {
   }
   trendData.sort((a, b) => a.week.localeCompare(b.week));
 
-  // Tag distribution: all check-ins across history
+  // Tag distribution: all check-ins across history (team-level)
   const allTagCheckins = await db
     .select({ tag: checkins.tag })
     .from(checkins)
     .where(eq(checkins.teamId, activeTeamId));
 
-  // Week-over-week change
+  // Week-over-week change (team-level averages)
   const prevWeekDate = new Date();
   prevWeekDate.setDate(prevWeekDate.getDate() - 7);
   const prevWeek = getMonday(prevWeekDate);
@@ -134,16 +176,16 @@ export const load: PageServerLoad = async (event) => {
   }
 
   const weekOverWeek = {
-    clarity: { current: dimAvg(weekCheckins, 'clarityScore'), previous: dimAvg(prevCheckins, 'clarityScore') },
-    execution: { current: dimAvg(weekCheckins, 'executionScore'), previous: dimAvg(prevCheckins, 'executionScore') },
-    quality: { current: dimAvg(weekCheckins, 'qualityScore'), previous: dimAvg(prevCheckins, 'qualityScore') },
+    clarity: { current: dimAvg(weekCheckinsAll, 'clarityScore'), previous: dimAvg(prevCheckins, 'clarityScore') },
+    execution: { current: dimAvg(weekCheckinsAll, 'executionScore'), previous: dimAvg(prevCheckins, 'executionScore') },
+    quality: { current: dimAvg(weekCheckinsAll, 'qualityScore'), previous: dimAvg(prevCheckins, 'qualityScore') },
   };
 
   // Discord “status signals” from #general (content only). Optional.
   let generalSignals: string[] = [];
   try {
     const origin = event.url.origin;
-    const res = await fetch(`${origin}/api/discord-general`, {
+    const res = await fetch(`${origin}/api/discord-general?teamId=${activeTeamId}`, {
       headers: {
         cookie: event.request.headers.get('cookie') ?? ''
       }
@@ -168,7 +210,8 @@ export const load: PageServerLoad = async (event) => {
   return {
     team,
     members,
-    weekCheckins: weekCheckinsWithNames,
+    weekCheckins: weekCheckinsWithNamesAll,
+    reflectionCheckins: weekCheckinsForReflection,
     trendData,
     currentWeek,
     memberCount: members.length,
@@ -176,5 +219,6 @@ export const load: PageServerLoad = async (event) => {
     weekOverWeek,
     allTeams,
     generalSignals,
+    canPostToDiscord: isSuperadmin || isOrgAdmin,
   };
 };

@@ -13,39 +13,31 @@ const sql = neon(DATABASE_URL);
 const SUPERADMIN_EMAIL = 'isafontcu@gmail.com';
 
 // Password for the 3 org-admin seed users (and other demo members).
-// You asked to be able to log in as the 3 org-admin users.
 const SEED_PASSWORD = 'SentioSeed!2026';
 
-type DbUser = {
-  id: string;
-  name: string;
-  email: string;
-};
-
-function getMonday(weeksAgo: number): string {
+function getMonday(weeksAgo) {
   const d = new Date();
   d.setDate(d.getDate() - d.getDay() + 1 - weeksAgo * 7);
   return d.toISOString().split('T')[0];
 }
 
-function clampScore(n: number): number {
+function clampScore(n) {
   return Math.max(1, Math.min(5, Math.round(n)));
 }
 
-function reflectionFor(opts: { reflections: string[]; orgIdx: number; teamIdx: number; memberIdx: number; weeksAgo: number }) {
-  const { reflections, orgIdx, teamIdx, memberIdx, weeksAgo } = opts;
+function reflectionFor({ reflections, orgIdx, teamIdx, memberIdx, weeksAgo }) {
   const idx = (orgIdx * 97 + teamIdx * 41 + memberIdx * 13 + weeksAgo * 7) % reflections.length;
   return reflections[idx];
 }
 
-function tagsForScores(avg: number) {
+function tagsForScores(avg) {
   if (avg >= 4) return 'momentum';
   if (avg >= 3) return 'neutral';
   if (avg >= 2) return 'risk';
   return 'blocked';
 }
 
-async function hashPassword(password: string): Promise<string> {
+async function hashPassword(password) {
   // Must match Better Auth’s internal password hashing:
   // `${salt}:${hex(scryptAsync(password.normalize("NFKC"), salt, {N,r,p,dkLen,maxmem}))}`
   const N = 16384;
@@ -67,13 +59,13 @@ async function hashPassword(password: string): Promise<string> {
   return `${saltHex}:${keyHex}`;
 }
 
-async function upsertUserAndResetCredentialAccount(input: { name: string; email: string }): Promise<string> {
+async function upsertUserAndResetCredentialAccount({ name, email }) {
   // Create / update user row, then ensure a valid Better Auth credential account exists.
   const userId = randomUUID();
 
-  const [user] = await sql<DbUser[]>`
+  const [user] = await sql`
     INSERT INTO "user" (id, name, email, email_verified, created_at, updated_at)
-    VALUES (${userId}, ${input.name}, ${input.email}, true, NOW(), NOW())
+    VALUES (${userId}, ${name}, ${email}, true, NOW(), NOW())
     ON CONFLICT (email) DO UPDATE
       SET name = EXCLUDED.name,
           email_verified = true,
@@ -81,8 +73,6 @@ async function upsertUserAndResetCredentialAccount(input: { name: string; email:
     RETURNING id, name, email
   `;
 
-  // Better Auth credential accounts are linked via (provider_id='credential', user_id).
-  // Since account has no unique constraints, we delete and recreate to guarantee password correctness.
   await sql`
     DELETE FROM "account"
     WHERE provider_id = 'credential' AND user_id = ${user.id}
@@ -98,19 +88,15 @@ async function upsertUserAndResetCredentialAccount(input: { name: string; email:
   return user.id;
 }
 
-async function ensureSuperadminUserIfMissing(): Promise<string | null> {
-  const [row] = await sql<DbUser[]>`
+async function ensureSuperadminUserIfMissing() {
+  const [row] = await sql`
     SELECT id, name, email
     FROM "user"
     WHERE email = ${SUPERADMIN_EMAIL}
     LIMIT 1
   `;
-
-  if (!row) return null;
-  return row.id;
+  return row?.id ?? null;
 }
-
-const tags = ['momentum', 'risk', 'blocked', 'neutral'] as const;
 
 const reflections = [
   'Feeling great about the sprint, we shipped the feature ahead of schedule.',
@@ -135,11 +121,7 @@ const reflections = [
   'Cross-team dependency is the biggest bottleneck right now.'
 ];
 
-type TeamArchetype = 'declining' | 'volatile' | 'mediocre';
-
-function scoresForArchetype(input: { archetype: TeamArchetype; weeksAgo: number; orgIdx: number; teamIdx: number; memberIdx: number }) {
-  const { archetype, weeksAgo, orgIdx, teamIdx, memberIdx } = input;
-
+function scoresForArchetype({ archetype, weeksAgo, orgIdx, teamIdx, memberIdx }) {
   // weeksAgo: 0 = current week, 7 = oldest seeded week.
   const x = weeksAgo;
   const wave1 = Math.sin((x + 1) * (memberIdx + 1) * 1.13 + orgIdx * 0.7 + teamIdx);
@@ -164,7 +146,6 @@ function scoresForArchetype(input: { archetype: TeamArchetype; weeksAgo: number;
     qualityBase = 2.8 + wave1 * 0.22;
   }
 
-  // Member-specific bias keeps heatmaps visually diverse without randomness.
   const bias = (memberIdx - 1.2) * 0.08;
 
   const clarity = clampScore(clarityBase + bias);
@@ -188,60 +169,46 @@ async function seed() {
   `;
   console.log('  Cleared.\n');
 
-  // 3 orgs, 3 teams each (9 teams total)
   const orgs = [
     {
       name: 'Nebula Labs',
       teams: [
-        { name: 'Team 1', inviteCode: 'NEB042', archetype: 'declining' as TeamArchetype },
-        { name: 'Team 2', inviteCode: 'NEB043', archetype: 'volatile' as TeamArchetype },
-        { name: 'Team 3', inviteCode: 'NEB044', archetype: 'mediocre' as TeamArchetype }
+        { name: 'Team 1', inviteCode: 'NEB042', archetype: 'declining' },
+        { name: 'Team 2', inviteCode: 'NEB043', archetype: 'volatile' },
+        { name: 'Team 3', inviteCode: 'NEB044', archetype: 'mediocre' }
       ]
     },
     {
       name: 'Orbit Engine',
       teams: [
-        { name: 'Team 1', inviteCode: 'ORB777', archetype: 'volatile' as TeamArchetype },
-        { name: 'Team 2', inviteCode: 'ORB778', archetype: 'mediocre' as TeamArchetype },
-        { name: 'Team 3', inviteCode: 'ORB779', archetype: 'declining' as TeamArchetype }
+        { name: 'Team 1', inviteCode: 'ORB777', archetype: 'volatile' },
+        { name: 'Team 2', inviteCode: 'ORB778', archetype: 'mediocre' },
+        { name: 'Team 3', inviteCode: 'ORB779', archetype: 'declining' }
       ]
     },
     {
       name: 'Patchwork Co',
       teams: [
-        { name: 'Team 1', inviteCode: 'PAT999', archetype: 'mediocre' as TeamArchetype },
-        { name: 'Team 2', inviteCode: 'PAT998', archetype: 'declining' as TeamArchetype },
-        { name: 'Team 3', inviteCode: 'PAT997', archetype: 'volatile' as TeamArchetype }
+        { name: 'Team 1', inviteCode: 'PAT999', archetype: 'mediocre' },
+        { name: 'Team 2', inviteCode: 'PAT998', archetype: 'declining' },
+        { name: 'Team 3', inviteCode: 'PAT997', archetype: 'volatile' }
       ]
     }
   ];
 
   const adminUsers = [
-    {
-      orgName: 'Nebula Labs',
-      name: 'Nebula Org Admin',
-      email: 'nebula.admin@sentio-seed.dev'
-    },
-    {
-      orgName: 'Orbit Engine',
-      name: 'Orbit Org Admin',
-      email: 'orbit.admin@sentio-seed.dev'
-    },
-    {
-      orgName: 'Patchwork Co',
-      name: 'Patchwork Org Admin',
-      email: 'patchwork.admin@sentio-seed.dev'
-    }
+    { orgName: 'Nebula Labs', name: 'Nebula Org Admin', email: 'nebula.admin@sentio-seed.dev' },
+    { orgName: 'Orbit Engine', name: 'Orbit Org Admin', email: 'orbit.admin@sentio-seed.dev' },
+    { orgName: 'Patchwork Co', name: 'Patchwork Org Admin', email: 'patchwork.admin@sentio-seed.dev' }
   ];
 
-  // Create org-level member accounts per team.
-  const memberAccounts: Record<string, { name: string; email: string }[]> = {};
-  for (const [orgIdx, org] of orgs.entries()) {
-    memberAccounts[org.name] = [];
-
-    for (const [teamIdx, team] of org.teams.entries()) {
-      const base = `${org.name}-${team.name}`.toLowerCase().replace(/\s+/g, '-');
-      memberAccounts[org.name].push(
+  // Two member accounts per team (team1/team2/team3) => 6 members per org
+  const memberAccountsByOrg = {};
+  for (const org of orgs) {
+    memberAccountsByOrg[org.name] = [];
+    for (const [teamIdx] of org.teams.entries()) {
+      const base = `${org.name}-Team-${teamIdx + 1}`.toLowerCase().replace(/\s+/g, '-');
+      memberAccountsByOrg[org.name].push(
         { name: `${org.name.split(' ')[0]} M${teamIdx + 1}A`, email: `${base}.m1@sentio-seed.dev` },
         { name: `${org.name.split(' ')[0]} M${teamIdx + 1}B`, email: `${base}.m2@sentio-seed.dev` }
       );
@@ -253,21 +220,15 @@ async function seed() {
     console.warn(`Superadmin user not found in DB: ${SUPERADMIN_EMAIL}. Team membership for them will be skipped.`);
   }
 
-  const orgAdminByEmail = new Map(adminUsers.map(u => [u.email, u]));
-
-  // Create org-admin + member users (real Better Auth accounts)
-  const userIdByEmail = new Map<string, string>();
-  const allSeedUsers: { name: string; email: string }[] = [];
-
-  allSeedUsers.push(...adminUsers.map(a => ({ name: a.name, email: a.email })));
-  for (const org of orgs) {
-    const entries = memberAccounts[org.name];
-    allSeedUsers.push(...entries);
-  }
+  const userIdByEmail = new Map();
+  const allSeedUsers = [
+    ...adminUsers.map(a => ({ name: a.name, email: a.email })),
+    ...orgs.flatMap(o => memberAccountsByOrg[o.name])
+  ];
 
   console.log(`  Creating/changing ${allSeedUsers.length} demo users (Better Auth credential accounts)...`);
   for (const u of allSeedUsers) {
-    const userId = await upsertUserAndResetCredentialAccount({ name: u.name, email: u.email });
+    const userId = await upsertUserAndResetCredentialAccount(u);
     userIdByEmail.set(u.email, userId);
   }
   console.log('  Users ready.\n');
@@ -276,10 +237,12 @@ async function seed() {
 
   for (const [orgIdx, org] of orgs.entries()) {
     const organizationId = randomUUID();
+    const orgAdmin = adminUsers.find(a => a.orgName === org.name);
+    const orgAdminUserId = userIdByEmail.get(orgAdmin.email);
 
     await sql`
       INSERT INTO organizations (id, name, created_by, created_at)
-      VALUES (${organizationId}, ${org.name}, ${userIdByEmail.get(adminUsers.find(a => a.orgName === org.name)!.email)!}, NOW())
+      VALUES (${organizationId}, ${org.name}, ${orgAdminUserId}, NOW())
     `;
 
     for (const [teamIdx, team] of org.teams.entries()) {
@@ -303,31 +266,25 @@ async function seed() {
           ${team.inviteCode},
           NULL,
           ${DISCORD_GENERAL_CHANNEL_ID || null},
-          ${userIdByEmail.get(adminUsers.find(a => a.orgName === org.name)!.email)!},
+          ${orgAdminUserId},
           NOW()
         )
       `;
 
-      const orgAdmin = adminUsers.find(a => a.orgName === org.name)!;
-      const orgAdminUserId = userIdByEmail.get(orgAdmin.email)!;
-
-      // Team 1 includes the org admin (role=admin), other teams include only members.
-      const teamMembersList: { email: string; displayName: string; role: 'admin' | 'member' }[] = [];
-      const memberPairs = memberAccounts[org.name];
+      const memberPairs = memberAccountsByOrg[org.name];
       const memberPairStart = teamIdx * 2;
 
+      const teamMembersList = [];
       if (teamIdx === 0) {
         teamMembersList.push({ email: orgAdmin.email, displayName: orgAdmin.name, role: 'admin' });
       }
-
       const m1 = memberPairs[memberPairStart];
       const m2 = memberPairs[memberPairStart + 1];
-
       teamMembersList.push({ email: m1.email, displayName: m1.name, role: 'member' });
       teamMembersList.push({ email: m2.email, displayName: m2.name, role: 'member' });
 
       for (const [memberIdx, m] of teamMembersList.entries()) {
-        const userId = userIdByEmail.get(m.email)!;
+        const userId = userIdByEmail.get(m.email);
 
         await sql`
           INSERT INTO team_members (id, team_id, user_id, display_name, role, joined_at)
@@ -335,25 +292,11 @@ async function seed() {
           ON CONFLICT (team_id, user_id) DO NOTHING
         `;
 
-        // 8 weeks of check-ins for everyone in this team.
         for (let weeksAgo = 7; weeksAgo >= 0; weeksAgo--) {
-          const scores = scoresForArchetype({
-            archetype: team.archetype,
-            weeksAgo,
-            orgIdx,
-            teamIdx,
-            memberIdx
-          });
-
+          const scores = scoresForArchetype({ archetype: team.archetype, weeksAgo, orgIdx, teamIdx, memberIdx });
           const avg = (scores.clarity + scores.execution + scores.quality) / 3;
-          const tag = tagsForScores(avg) as (typeof tags)[number];
-          const reflection = reflectionFor({
-            reflections,
-            orgIdx,
-            teamIdx,
-            memberIdx,
-            weeksAgo
-          });
+          const tag = tagsForScores(avg);
+          const reflection = reflectionFor({ reflections, orgIdx, teamIdx, memberIdx, weeksAgo });
 
           await sql`
             INSERT INTO checkins (
@@ -385,7 +328,6 @@ async function seed() {
         }
       }
 
-      // Superadmin is assigned to Nebula Labs → Team 1 for check-ins.
       if (org.name === 'Nebula Labs' && teamIdx === 0 && superadminUserId) {
         await sql`
           INSERT INTO team_members (id, team_id, user_id, display_name, role, joined_at)
@@ -401,23 +343,10 @@ async function seed() {
         `;
 
         for (let weeksAgo = 7; weeksAgo >= 0; weeksAgo--) {
-          const scores = scoresForArchetype({
-            archetype: team.archetype,
-            weeksAgo,
-            orgIdx,
-            teamIdx,
-            memberIdx: 99
-          });
-
+          const scores = scoresForArchetype({ archetype: team.archetype, weeksAgo, orgIdx, teamIdx, memberIdx: 99 });
           const avg = (scores.clarity + scores.execution + scores.quality) / 3;
-          const tag = tagsForScores(avg) as (typeof tags)[number];
-          const reflection = reflectionFor({
-            reflections,
-            orgIdx,
-            teamIdx,
-            memberIdx: 99,
-            weeksAgo
-          });
+          const tag = tagsForScores(avg);
+          const reflection = reflectionFor({ reflections, orgIdx, teamIdx, memberIdx: 99, weeksAgo });
 
           await sql`
             INSERT INTO checkins (
@@ -458,8 +387,7 @@ async function seed() {
     console.log(`  Email: ${a.email}`);
     console.log(`  Password: ${SEED_PASSWORD}`);
   }
-
-  console.log('\nTip: members exist too, but only org-admin credentials are printed above.');
+  console.log('\n(Discord write webhooks are left null in seed; set them in Settings per team.)');
 }
 
 seed().catch((e) => {

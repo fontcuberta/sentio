@@ -1,10 +1,19 @@
 import { pgTable, uuid, text, integer, date, timestamp, unique } from 'drizzle-orm/pg-core';
 
+export const organizations = pgTable('organizations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  createdBy: text('created_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const teams = pgTable('teams', {
   id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   inviteCode: text('invite_code').notNull().unique(),
   discordWebhookUrl: text('discord_webhook_url'),
+  discordGeneralChannelId: text('discord_general_channel_id'),
   createdBy: text('created_by').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 });

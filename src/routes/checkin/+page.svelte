@@ -4,12 +4,20 @@
 
   let { data, form }: { data: PageServerData; form: ActionData } = $props();
 
-  const existing = data.existing;
-  let clarity = $state(existing?.clarityScore ?? 3);
-  let execution = $state(existing?.executionScore ?? 3);
-  let quality = $state(existing?.qualityScore ?? 3);
-  let reflection = $state(existing?.reflection ?? '');
-  let tag = $state(existing?.tag ?? '');
+  let clarity = $state(3);
+  let execution = $state(3);
+  let quality = $state(3);
+  let reflection = $state('');
+  let tag = $state('');
+
+  $effect(() => {
+    const existing = data.existing;
+    clarity = existing?.clarityScore ?? 3;
+    execution = existing?.executionScore ?? 3;
+    quality = existing?.qualityScore ?? 3;
+    reflection = existing?.reflection ?? '';
+    tag = existing?.tag ?? '';
+  });
 
   const dimensions = [
     { key: 'clarity', label: 'Clarity', hint: "Do we know what we're building and why?", get value() { return clarity; }, set value(v: number) { clarity = v; } },

@@ -15,13 +15,16 @@ function getMonday(d: Date): string {
 export const load: PageServerLoad = async (event) => {
   if (!event.locals.user) return redirect(302, '/login');
 
-  const [membership] = await db
+  const memberships = await db
     .select()
     .from(teamMembers)
-    .where(eq(teamMembers.userId, event.locals.user.id))
-    .limit(1);
+    .where(eq(teamMembers.userId, event.locals.user.id));
 
-  if (!membership) return redirect(302, '/onboarding');
+  if (!memberships.length) return redirect(302, '/onboarding');
+
+  const membershipTeamIds = memberships.map(m => m.teamId);
+  const teamIdParam = event.url.searchParams.get('team');
+  const teamId = teamIdParam && membershipTeamIds.includes(teamIdParam) ? teamIdParam : memberships[0].teamId;
 
   const weekOf = getMonday(new Date());
 
@@ -31,14 +34,14 @@ export const load: PageServerLoad = async (event) => {
     .where(
       and(
         eq(checkins.userId, event.locals.user.id),
-        eq(checkins.teamId, membership.teamId),
+        eq(checkins.teamId, teamId),
         eq(checkins.weekOf, weekOf)
       )
     )
     .limit(1);
 
   return {
-    teamId: membership.teamId,
+    teamId,
     existing: existing ?? null
   };
 };
@@ -64,6 +67,19 @@ export const actions: Actions = {
     }
 
     const weekOf = getMonday(new Date());
+
+    const [membership] = await db
+      .select()
+      .from(teamMembers)
+      .where(
+        and(
+          eq(teamMembers.userId, event.locals.user.id),
+          eq(teamMembers.teamId, teamId)
+        )
+      )
+      .limit(1);
+
+    if (!membership) return fail(403, { message: 'Forbidden' });
 
     const [existing] = await db
       .select({ id: checkins.id })

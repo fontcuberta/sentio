@@ -206,10 +206,10 @@
     <p class="section-hint">
       Short written notes from this week’s check-ins. Use them to add narrative to the numbers above.
     </p>
-    <ReflectionFeed checkins={data.weekCheckins} />
+    <ReflectionFeed checkins={data.reflectionCheckins} />
   </section>
 
-  {#if data.team?.discordWebhookUrl}
+  {#if data.canPostToDiscord && data.team?.discordWebhookUrl}
     <section class="discord-section">
       <WeeklySummary
         teamId={data.team.id}

@@ -1,6 +1,11 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { env } from '$env/dynamic/private';
+import { db } from '$lib/server/db';
+import { teams, teamMembers } from '$lib/server/db/schema';
+import { and, eq, inArray } from 'drizzle-orm';
+
+const SUPERADMIN_EMAIL = 'isafontcu@gmail.com';
 
 function normalize(s: string) {
   return s.toLowerCase();
@@ -32,9 +37,52 @@ function looksLikeStatusMessage(content: string) {
 }
 
 // Returns a small list of “status signal” phrases from #general (content only).
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async (event) => {
+  const viewer = event.locals.user;
+  if (!viewer) throw error(401, 'Unauthorized');
+
+  const teamId = event.url.searchParams.get('teamId');
+  if (!teamId) throw error(400, 'Missing teamId');
+
+  const [targetTeam] = await db
+    .select({ discordGeneralChannelId: teams.discordGeneralChannelId, organizationId: teams.organizationId })
+    .from(teams)
+    .where(eq(teams.id, teamId))
+    .limit(1);
+
+  if (!targetTeam) throw error(404, 'Team not found');
+
+  const isSuperadmin = viewer.email?.toLowerCase() === SUPERADMIN_EMAIL;
+
+  // Permission checks:
+  // - superadmin: can read any team
+  // - org-admin (role=admin on any team): can read any team in that org
+  // - member: can read only teams they're in
+  if (!isSuperadmin) {
+    const memberships = await db
+      .select({ teamId: teamMembers.teamId, role: teamMembers.role })
+      .from(teamMembers)
+      .where(eq(teamMembers.userId, viewer.id));
+
+    const memberTeamIds = memberships.map(m => m.teamId);
+    const isMemberOfTeam = memberTeamIds.includes(teamId);
+
+    const adminTeamIds = memberships.filter(m => m.role === 'admin').map(m => m.teamId);
+    if (!isMemberOfTeam) {
+      if (!adminTeamIds.length) throw error(403, 'Forbidden');
+
+      const adminOrgRows = await db
+        .select({ organizationId: teams.organizationId })
+        .from(teams)
+        .where(inArray(teams.id, adminTeamIds));
+
+      const adminOrgIds = new Set(adminOrgRows.map(r => r.organizationId));
+      if (!adminOrgIds.has(targetTeam.organizationId)) throw error(403, 'Forbidden');
+    }
+  }
+
   const token = env.DISCORD_BOT_TOKEN;
-  const channelId = env.DISCORD_GENERAL_CHANNEL_ID;
+  const channelId = targetTeam.discordGeneralChannelId;
 
   if (!token || !channelId) {
     return json({

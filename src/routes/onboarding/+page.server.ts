@@ -1,8 +1,9 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import { teams, teamMembers } from '$lib/server/db/schema';
+import { teams, teamMembers, organizations } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
+import { env } from '$env/dynamic/private';
 
 function generateInviteCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -22,7 +23,7 @@ export const load: PageServerLoad = async (event) => {
     .where(eq(teamMembers.userId, event.locals.user.id))
     .limit(1);
 
-  if (membership.length) return redirect(302, '/dashboard');
+  if (membership.length) return redirect(302, '/checkin');
 
   return {};
 };
@@ -40,9 +41,20 @@ export const actions: Actions = {
 
     const inviteCode = generateInviteCode();
 
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name, createdBy: event.locals.user.id })
+      .returning();
+
     const [team] = await db
       .insert(teams)
-      .values({ name, inviteCode, createdBy: event.locals.user.id })
+      .values({
+        organizationId: organization.id,
+        name,
+        inviteCode,
+        discordGeneralChannelId: env.DISCORD_GENERAL_CHANNEL_ID,
+        createdBy: event.locals.user.id
+      })
       .returning();
 
     await db.insert(teamMembers).values({
@@ -52,7 +64,7 @@ export const actions: Actions = {
       role: 'admin'
     });
 
-    return redirect(302, '/dashboard');
+    return redirect(302, '/checkin');
   },
 
   joinTeam: async (event) => {
@@ -87,6 +99,6 @@ export const actions: Actions = {
       throw err;
     }
 
-    return redirect(302, '/dashboard');
+    return redirect(302, '/checkin');
   }
 };
