@@ -100,6 +100,16 @@
     text-align: center;
     padding: 0.4rem 0.5rem;
     border-bottom: 1px solid rgba(42, 42, 58, 0.4);
+    transition: background var(--motion-duration) var(--motion-ease), box-shadow var(--motion-duration) var(--motion-ease);
+  }
+
+  .heatmap tbody tr:hover td {
+    background: rgba(0, 240, 255, 0.03);
+    box-shadow: inset 0 0 0 1px rgba(0, 240, 255, 0.12);
+  }
+
+  .heatmap tbody tr:hover .member-name {
+    color: var(--accent);
   }
 
   .member-name {

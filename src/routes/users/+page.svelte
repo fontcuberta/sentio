@@ -205,6 +205,14 @@
     vertical-align: top;
   }
 
+  .users-table tbody tr {
+    transition: background var(--motion-duration) var(--motion-ease);
+  }
+
+  .users-table tbody tr:hover {
+    background: rgba(0, 240, 255, 0.04);
+  }
+
   .teams-cell {
     display: flex;
     flex-wrap: wrap;
